@@ -405,3 +405,46 @@ class dagman_file(base_buffer):
             ret += " NOOP"
         return ret
 
+class dag_node:
+    def __init__(self, name, dir=None, noop=False, done=False, vars={}):
+        self.children = []
+        self.name = name
+        self.dir = dir
+        self.noop = noop
+        self.done = done
+        self.vars = vars
+        return
+
+    def ___get_child_name___(self, child):
+        if type(child) is str:
+            return child
+        elif hasattr(child, 'name'):
+            return child.name
+        else:
+            return None
+
+    def add_child(self, child):
+        c_name = self.___get_child_name___(child)
+        if c_name is None:
+            raise ValueError("Cannot add child!")
+        children.append(child)
+
+    def add_children(self, children):
+        for child in children:
+            self.add_child(child)
+
+    @stringify(0, 1, 0)
+    def add_var(self, variable, value):
+        self.vars[variable] = value
+
+    def write_node_definition(self, dag_file):
+        dag_file.job(self.name, self.file, self.dir, self.noop, self.done)
+        for key in self.vars.keys():
+            dag_file.vars(self.name, [key], [self.vars[key]])
+
+    def write_node_relationships(self, dag_file):
+        dag_file.dependency(self.name, [self.___get_child_name___(child) for child in self.children])
+
+class dagman:
+    def __init__(name):
+        return
