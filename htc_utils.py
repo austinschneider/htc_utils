@@ -42,7 +42,7 @@ def condor_add(f):
 def buffer(f):
     def func(self, *args, **kwargs):
         ret = f(self, *args, **kwargs)
-        self.buffer += ret + '\n'
+        self.buffer.append(ret)
         return ret
     return func
 
@@ -104,7 +104,7 @@ def dagman_parse(f):
 
 class condor_file:
     def __init__(self):
-        self.buffer = ''
+        self.buffer = []
         return
 
     @buffer
@@ -188,7 +188,7 @@ class condor_file:
 
 class dagman_file:
     def __init__(self) :
-        self.buffer = ''
+        self.buffer = []
         return
 
     @buffer
