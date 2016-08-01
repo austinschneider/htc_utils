@@ -261,7 +261,7 @@ class dagman_file:
     @stringify(0, 1, 1, 1)
     def abort_dag_on(self, name, exit_value, dag_ret_value=None):
         """
-        abort_dag_on(JobName, AbortExitValue, DAGReturnValue=None)
+        abort_dag_on(JobName, AbortExitValue, dag_ret_value=None)
         ABORT-DAG-ON JobName AbortExitValue [RETURN DAGReturnValue]
         """
         ret = "ABORT-DAG-ON " + name + " " + exit_value
@@ -302,27 +302,47 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1)
     def priority(self, name, priority):
+        """
+        priority(JobName, PriorityValue)
+        PRIORITY JobName PriorityValue
+        """
         return "PRIORITY " + name + " " + priority
 
     @buffer
     @stringify(0, 1, 1)
     def category(self, job_name, category_name):
+        """
+        category(JobName, CategoryName)
+        CATEGORY JobName CategoryName
+        """
         return "CATEGORY " + job_name + " " + category_name
 
     @buffer
     @stringify(0, 1, 1)
     def max_jobs(self, category_name, max_jobs):
+        """
+        max_jobs(CategoryName, MaxJobsValue)
+        MAXJOBS CategoryName MaxJobsValue
+        """
         return "MAXJOBS " + category_name + " " + max_jobs
 
     @buffer
     @stringify(0, 1)
     def config(self, config_file):
+        """
+        config(ConfigFileName)
+        CONFIG ConfigFileName
+        """
         return "CONFIG " + config_file
 
     @buffer
     @stringify(0, 1, 1)
     def set_job_attr(self, attr, value):
-        return "SET_JOB_ATTR " + attr + " " + value
+        """
+        set_job_attr(AttributeName, AttributeValue)
+        SET_JOB_ATTR AttributeName=AttributeValue
+        """
+        return "SET_JOB_ATTR " + attr + "=" + value
 
     @buffer
     @stringify(0, 1, 1, 1, 0, 0, 0)
