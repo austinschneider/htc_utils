@@ -406,9 +406,10 @@ class dagman_file(base_buffer):
         return ret
 
 class dag_node:
-    def __init__(self, name, dir=None, noop=False, done=False, vars={}):
+    def __init__(self, name, file, dir=None, noop=False, done=False, vars={}):
         self.children = []
         self.name = name
+        self.file = file
         self.dir = dir
         self.noop = noop
         self.done = done
@@ -433,7 +434,6 @@ class dag_node:
         for child in children:
             self.add_child(child)
 
-    @stringify(0, 1, 0)
     def add_var(self, variable, value):
         self.vars[variable] = value
 
