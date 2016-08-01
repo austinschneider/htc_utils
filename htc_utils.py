@@ -41,6 +41,8 @@ def condor_add(f):
 
 def buffer(f):
     def func(self, *args, **kwargs):
+        if hasattr(self, 'redo_buffer'):
+            self.redo_buffer = []
         ret = f(self, *args, **kwargs)
         self.buffer.append(ret)
         return ret
@@ -105,7 +107,16 @@ def dagman_parse(f):
 class condor_file:
     def __init__(self):
         self.buffer = []
+        self.redo_buffer = []
         return
+
+    def undo(self):
+        if len(self.buffer > 0):
+            self.redo_buffer.append(self.buffer.pop())
+
+    def redo(self):
+        if len(self.redo_buffer > 0):
+            self.buffer.append(self.redo_buffer.pop())
 
     @buffer
     @condor_parse
@@ -189,7 +200,16 @@ class condor_file:
 class dagman_file:
     def __init__(self) :
         self.buffer = []
+        self.redo_buffer = []
         return
+
+    def undo(self):
+        if len(self.buffer > 0):
+            self.redo_buffer.append(self.buffer.pop())
+
+    def redo(self):
+        if len(self.redo_buffer > 0):
+            self.buffer.append(self.redo_buffer.pop())
 
     @buffer
     @stringify(0, 1, 1, 1, 0, 0)
