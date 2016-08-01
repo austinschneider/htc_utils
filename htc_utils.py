@@ -32,13 +32,6 @@ def param_transform(param, string_quotes=True):
 def condor_transform(param):
     return param_transform(param, string_quotes=False)
 
-def dagman_transform(param):
-    return param_transform(param, string_quotes=True)
-
-def condor_add(f):
-    condor[f.__name__] = f
-    return f
-
 def buffer(f):
     def func(self, *args, **kwargs):
         if hasattr(self, 'redo_buffer'):
@@ -86,22 +79,6 @@ def condor_parse(f):
         def func(self, *args):
             args = [condor_transform(arg) for arg in args]
             return f(self, *args)
-    return func
-
-def dagman_parse(f):
-    if len(inspect.getargspec(f).args) ==  1:
-        @wraps(f)
-        def func(self):
-            return f.__name__
-    elif len(inspect.getargspec(f).args) == 2:
-        @wraps(f)
-        def func(self, arg):
-            return "%s = %s" % (f.__name__, dagman_transform(arg))
-    else:
-        @wraps(f)
-        def func(self, *args):
-            args = [dagman_transform(arg) for arg in args]
-            return f(*args)
     return func
 
 class condor_file:
