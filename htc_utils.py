@@ -81,19 +81,40 @@ def condor_parse(f):
             return f(self, *args)
     return func
 
-class condor_file:
+class base_buffer(object):
     def __init__(self):
         self.buffer = []
         self.redo_buffer = []
         return
 
     def undo(self):
-        if len(self.buffer > 0):
+        """
+        Undo last buffer action.
+        """
+        if len(self.buffer) > 0:
             self.redo_buffer.append(self.buffer.pop())
 
     def redo(self):
-        if len(self.redo_buffer > 0):
+        """
+        Redo last buffer action undone.
+        """
+        if len(self.redo_buffer) > 0:
             self.buffer.append(self.redo_buffer.pop())
+
+    def clear(self):
+        """
+        Clear undo and redo buffers.
+        """
+        self.buffer = []
+        self.redo_buffer = []
+
+class condor_file(base_buffer):
+    def __init__(self):
+        super(condor_file, self).__init__()
+        return
+
+    def __str__(self):
+        return str.join("\n", self.buffer)
 
     @buffer
     @condor_parse
@@ -174,25 +195,13 @@ class condor_file:
         elif n == 1:
             return "queue %d" % args[0]
 
-class dagman_file:
-    def __init__(self) :
-        self.buffer = []
-        self.redo_buffer = []
+class dagman_file(base_buffer):
+    def __init__(self):
+        super(dagman_file, self).__init__()
         return
 
-    def undo(self):
-        """
-        Undo the last buffer action.
-        """
-        if len(self.buffer > 0):
-            self.redo_buffer.append(self.buffer.pop())
-
-    def redo(self):
-        """
-        Repeat the last buffer action undone.
-        """
-        if len(self.redo_buffer > 0):
-            self.buffer.append(self.redo_buffer.pop())
+    def __str__(self):
+        return str.join("\n", self.buffer)
 
     @buffer
     @stringify(0, 1, 1, 1, 0, 0)
