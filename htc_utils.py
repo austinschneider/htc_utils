@@ -32,17 +32,12 @@ def param_transform(param, string_quotes=True):
 def condor_transform(param):
     return param_transform(param, string_quotes=False)
 
-def dagman_transform(param):
-    return param_transform(param, string_quotes=True)
-
-def condor_add(f):
-    condor[f.__name__] = f
-    return f
-
 def buffer(f):
     def func(self, *args, **kwargs):
+        if hasattr(self, 'redo_buffer'):
+            self.redo_buffer = []
         ret = f(self, *args, **kwargs)
-        self.buffer += ret + '\n'
+        self.buffer.append(ret)
         return ret
     return func
 
@@ -86,26 +81,40 @@ def condor_parse(f):
             return f(self, *args)
     return func
 
-def dagman_parse(f):
-    if len(inspect.getargspec(f).args) ==  1:
-        @wraps(f)
-        def func(self):
-            return f.__name__
-    elif len(inspect.getargspec(f).args) == 2:
-        @wraps(f)
-        def func(self, arg):
-            return "%s = %s" % (f.__name__, dagman_transform(arg))
-    else:
-        @wraps(f)
-        def func(self, *args):
-            args = [dagman_transform(arg) for arg in args]
-            return f(*args)
-    return func
-
-class condor_file:
+class base_buffer(object):
     def __init__(self):
-        self.buffer = ''
+        self.buffer = []
+        self.redo_buffer = []
         return
+
+    def undo(self):
+        """
+        Undo last buffer action.
+        """
+        if len(self.buffer) > 0:
+            self.redo_buffer.append(self.buffer.pop())
+
+    def redo(self):
+        """
+        Redo last buffer action undone.
+        """
+        if len(self.redo_buffer) > 0:
+            self.buffer.append(self.redo_buffer.pop())
+
+    def clear(self):
+        """
+        Clear undo and redo buffers.
+        """
+        self.buffer = []
+        self.redo_buffer = []
+
+class condor_file(base_buffer):
+    def __init__(self):
+        super(condor_file, self).__init__()
+        return
+
+    def __str__(self):
+        return str.join("\n", self.buffer)
 
     @buffer
     @condor_parse
@@ -186,10 +195,13 @@ class condor_file:
         elif n == 1:
             return "queue %d" % args[0]
 
-class dagman_file:
-    def __init__(self) :
-        self.buffer = ''
+class dagman_file(base_buffer):
+    def __init__(self):
+        super(dagman_file, self).__init__()
         return
+
+    def __str__(self):
+        return str.join("\n", self.buffer)
 
     @buffer
     @stringify(0, 1, 1, 1, 0, 0)
@@ -264,7 +276,7 @@ class dagman_file:
     @stringify(0, 1, 1, 1)
     def abort_dag_on(self, name, exit_value, dag_ret_value=None):
         """
-        abort_dag_on(JobName, AbortExitValue, DAGReturnValue=None)
+        abort_dag_on(JobName, AbortExitValue, dag_ret_value=None)
         ABORT-DAG-ON JobName AbortExitValue [RETURN DAGReturnValue]
         """
         ret = "ABORT-DAG-ON " + name + " " + exit_value
@@ -305,31 +317,55 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1)
     def priority(self, name, priority):
+        """
+        priority(JobName, PriorityValue)
+        PRIORITY JobName PriorityValue
+        """
         return "PRIORITY " + name + " " + priority
 
     @buffer
     @stringify(0, 1, 1)
     def category(self, job_name, category_name):
+        """
+        category(JobName, CategoryName)
+        CATEGORY JobName CategoryName
+        """
         return "CATEGORY " + job_name + " " + category_name
 
     @buffer
     @stringify(0, 1, 1)
     def max_jobs(self, category_name, max_jobs):
+        """
+        max_jobs(CategoryName, MaxJobsValue)
+        MAXJOBS CategoryName MaxJobsValue
+        """
         return "MAXJOBS " + category_name + " " + max_jobs
 
     @buffer
     @stringify(0, 1)
     def config(self, config_file):
+        """
+        config(ConfigFileName)
+        CONFIG ConfigFileName
+        """
         return "CONFIG " + config_file
 
     @buffer
     @stringify(0, 1, 1)
     def set_job_attr(self, attr, value):
-        return "SET_JOB_ATTR " + attr + " " + value
+        """
+        set_job_attr(AttributeName, AttributeValue)
+        SET_JOB_ATTR AttributeName=AttributeValue
+        """
+        return "SET_JOB_ATTR " + attr + "=" + value
 
     @buffer
     @stringify(0, 1, 1, 1, 0, 0, 0)
     def subdag(self, job_name, dag_file, dir=None, noop=False, done=False, external=False):
+        """
+        subdag(JobName, DagFileName, directory=None, noop=False, done=False, external=False)
+        SUBDAG EXTERNAL JobName DagFileName [DIR directory] [NOOP] [DONE]
+        """
         ret = "SUBDAG "
         if external:
             ret += "EXTERNAL "
@@ -346,6 +382,10 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1, 1)
     def splice(self, splice_name, dag_filename, dir=None):
+        """
+        splice(SpliceName, DagFileName, dir=None)
+        SPLICE SpliceName DagFileName [DIR directory]
+        """
         ret = "SPLICE " + splice_name + " " + dag_filename
         if dir is not None:
             ret += " DIR " + dir
@@ -354,6 +394,10 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1, 1, 0)
     def final(self, job_name, submit_file, dir=None, noop=False):
+        """
+        final(JobName, SubmitDescriptionFileName, dir=None, noop=False)
+        FINAL JobName SubmitDescriptionFileName [DIR directory] [NOOP]
+        """
         ret = "FINAL " + job_name + " " + submit_file
         if dir is not None:
             ret += " DIR " + dir
@@ -361,3 +405,46 @@ class dagman_file:
             ret += " NOOP"
         return ret
 
+class dag_node:
+    def __init__(self, name, file, dir=None, noop=False, done=False, vars={}):
+        self.children = []
+        self.name = name
+        self.file = file
+        self.dir = dir
+        self.noop = noop
+        self.done = done
+        self.vars = vars
+        return
+
+    def ___get_child_name___(self, child):
+        if type(child) is str:
+            return child
+        elif hasattr(child, 'name'):
+            return child.name
+        else:
+            return None
+
+    def add_child(self, child):
+        c_name = self.___get_child_name___(child)
+        if c_name is None:
+            raise ValueError("Cannot add child!")
+        children.append(child)
+
+    def add_children(self, children):
+        for child in children:
+            self.add_child(child)
+
+    def add_var(self, variable, value):
+        self.vars[variable] = value
+
+    def write_node_definition(self, dag_file):
+        dag_file.job(self.name, self.file, self.dir, self.noop, self.done)
+        for key in self.vars.keys():
+            dag_file.vars(self.name, [key], [self.vars[key]])
+
+    def write_node_relationships(self, dag_file):
+        dag_file.dependency(self.name, [self.___get_child_name___(child) for child in self.children])
+
+class dagman:
+    def __init__(name):
+        return
