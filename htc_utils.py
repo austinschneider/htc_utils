@@ -181,10 +181,16 @@ class dagman_file:
         return
 
     def undo(self):
+        """
+        Undo the last buffer action.
+        """
         if len(self.buffer > 0):
             self.redo_buffer.append(self.buffer.pop())
 
     def redo(self):
+        """
+        Repeat the last buffer action undone.
+        """
         if len(self.redo_buffer > 0):
             self.buffer.append(self.redo_buffer.pop())
 
@@ -347,6 +353,10 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1, 1, 0, 0, 0)
     def subdag(self, job_name, dag_file, dir=None, noop=False, done=False, external=False):
+        """
+        subdag(JobName, DagFileName, directory=None, noop=False, done=False, external=False)
+        SUBDAG EXTERNAL JobName DagFileName [DIR directory] [NOOP] [DONE]
+        """
         ret = "SUBDAG "
         if external:
             ret += "EXTERNAL "
@@ -363,6 +373,10 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1, 1)
     def splice(self, splice_name, dag_filename, dir=None):
+        """
+        splice(SpliceName, DagFileName, dir=None)
+        SPLICE SpliceName DagFileName [DIR directory]
+        """
         ret = "SPLICE " + splice_name + " " + dag_filename
         if dir is not None:
             ret += " DIR " + dir
@@ -371,6 +385,10 @@ class dagman_file:
     @buffer
     @stringify(0, 1, 1, 1, 0)
     def final(self, job_name, submit_file, dir=None, noop=False):
+        """
+        final(JobName, SubmitDescriptionFileName, dir=None, noop=False)
+        FINAL JobName SubmitDescriptionFileName [DIR directory] [NOOP]
+        """
         ret = "FINAL " + job_name + " " + submit_file
         if dir is not None:
             ret += " DIR " + dir
