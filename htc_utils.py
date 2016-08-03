@@ -14,7 +14,9 @@ def param_transform(param, string_quotes=True):
         quote = '"' 
     else:
         quote = ''
-    if type(param) is int:
+    if param is None:
+        return None
+    elif type(param) is int:
         ret = "%d" % param
     elif type(param) is str:
         ret = "%s" % param
@@ -195,6 +197,18 @@ class condor_file(base_buffer):
         elif n == 1:
             return "queue %d" % args[0]
 
+    @buffer
+    @condor_parse
+    def arguments(self, args): return
+
+    @buffer
+    @condor_parse
+    def notification(self, x): return
+
+    @buffer
+    def getenv(self, x):
+        return 'getenv = %s' % str(bool(x))
+
 class dagman_file(base_buffer):
     def __init__(self):
         super(dagman_file, self).__init__()
@@ -302,7 +316,7 @@ class dagman_file(base_buffer):
                     v += "="
                     v += param_transform(variables[key], string_quotes=True)
                     var_strings.append(v)
-                ret += " ".join(var_strings)
+                ret += str.join(" ", var_strings)
             except:
                 raise
         else:
@@ -312,6 +326,8 @@ class dagman_file(base_buffer):
                 v += param_transform(variables[i], string_quotes=False)
                 v += "="
                 v += param_transform(values[i], string_quotes=True)
+                var_strings.append(v)
+            ret += str.join(" ", var_strings)
         return ret
 
     @buffer
@@ -428,7 +444,7 @@ class dag_node:
         c_name = self.___get_child_name___(child)
         if c_name is None:
             raise ValueError("Cannot add child!")
-        children.append(child)
+        self.children.append(child)
 
     def add_children(self, children):
         for child in children:
@@ -443,7 +459,8 @@ class dag_node:
             dag_file.vars(self.name, [key], [self.vars[key]])
 
     def write_node_relationships(self, dag_file):
-        dag_file.dependency(self.name, [self.___get_child_name___(child) for child in self.children])
+        if len(self.children):
+            dag_file.dependency(self.name, [self.___get_child_name___(child) for child in self.children])
 
 class dagman:
     def __init__(name):
