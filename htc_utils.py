@@ -35,6 +35,7 @@ def condor_transform(param):
     return param_transform(param, string_quotes=False)
 
 def buffer(f):
+    @wraps(f)
     def func(self, *args, **kwargs):
         if hasattr(self, 'redo_buffer'):
             self.redo_buffer = []
