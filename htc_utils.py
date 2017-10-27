@@ -1,8 +1,98 @@
+import re
+import os
 import glob
+import random
 import ntpath
 import inspect
 import argparse
 from functools import wraps
+
+_animals = map(lambda s: s.strip(), open('./animals.txt', 'r').readlines())
+_adjectives = map( lambda s: s.strip(), open('./adjectives.txt', 'r').readlines())
+_n_animals = len(_animals)
+_n_adjectives = len(_adjectives)
+_animals_dict = dict(zip(_animals, xrange(_n_animals)))
+_adjectives_dict = dict(zip(_adjectives, xrange(_n_animals)))
+_n_uids = _n_adjectives ** 2 * _n_animals
+_uid_re = re.compile('([A-Z][a-z]+)([A-Z][a-z]+)([A-Z][a-z]+)')
+
+def _ntnnn(n):
+    n2 = int(n / _n_adjectives ** 2)
+    n -= n2 * _n_adjectives ** 2
+    n1 = int(n / _n_adjectives)
+    n -= n1 * _n_adjectives
+    n0 = n
+    return (n0, n1, n2)
+
+def _nnntn(nnn):
+    n0, n1, n2 = nnn
+    return n0 + _n_adjectives * n1 + _n_adjectives ** 2 * n2
+
+def _get_n(mmm):
+    m0, m1, m2 = mmm
+    n0 = _adjectives_dict[m0.lower()]
+    n1 = _adjectives_dict[m1.lower()]
+    n2 = _animals_dict[m2.lower()]
+
+    return _nnntn((n0, n1, n2))
+
+def _get_s(n):
+    n0, n1, n2 = _ntnnn(n)
+    m0 = _adjectives[n0]
+    m1 = _adjectives[n1]
+    m2 = _animals[n2]
+
+    caps = lambda x: x[0].upper() + x[1:]
+
+    return caps(m0) + caps(m1) + caps(m2)
+
+def _get_next_s(s):
+    x = _get_n(_uid_re.search(s).groups())
+    x = _f(x)
+    while x >= _n_uids:
+        x = _f(x)
+    return _get_s(x)
+
+def _g(x, n):
+    return (x >> (32 - n)) & 0x1
+
+def _f(x):
+    x |= (((1 ^ _g(x,22)) ^ _g(x,2)) ^ _g(x,1)) << 32
+    x = x >> 1
+    return x
+
+def gen_file_uid(directory):
+    if not os.path.isdir(directory):
+        directory = os.path.dirname(directory)
+    search_term = directory + '/*'
+    files = glob.glob(search_term)
+    files.sort(key=lambda x: min(os.path.getmtime(x), os.path.getctime(x)))
+    uid = None
+    for f in reversed(files):
+        m = _uid_re.search(os.path.basename(f))
+        if m:
+            try:
+                uid = _get_n(m.groups())
+                break
+            except Exception as e:
+                raise e
+    if uid is None:
+        uid = random.randint(1,_n_uids-1)
+    while True:
+        uid = _f(uid)
+        while uid >= _n_uids:
+            uid = _f(uid)
+        s = _get_s(uid)
+        if not len(glob.glob(directory + '/*' + s + '*')):
+            break
+
+    return s
+
+def get_next_file_uid(directory, last):
+    s = _get_next_s(last)
+    while len(glob.glob(directory + '/*' + s + '*')):
+        s = _get_next_s(s)
+    return s
 
 class Bunch:
     def __init__(self,**kw):
@@ -179,24 +269,9 @@ class condor_file(base_buffer):
     @condor_parse
     def interactivejob(self, x): return
 
-    queue_parser0 = argparse.ArgumentParser(description='Process queue arguments')
-    queue_parser0.add_argument('intexpr', metavar='intexpr', nargs='?', default='1', type=int)
-
-    queue_parser1 = argparse.ArgumentParser(description='Process queue arguments')
-    queue_parser1.add_argument('intexpr', metavar='intexpr', nargs='?', default='1', type=int)
-    queue_parser1.add_argument('varname', metavar='varname', nargs='?')
-
-    queue_parser2 = argparse.ArgumentParser(description='Process queue arguments')
-    queue_parser2.add_argument('intexpr', metavar='intexpr', nargs='?', default='1', type=int)
-    queue_parser2.add_argument('varnames', metavar='varnames', nargs='*')
-
     @buffer
     def queue(self, *args):
-        n = len(args)
-        if n == 0:
-            return "queue"
-        elif n == 1:
-            return "queue %d" % args[0]
+        return ' '.join(["queue"] + [condor_transform(x) for x in args])
 
     @buffer
     @condor_parse
